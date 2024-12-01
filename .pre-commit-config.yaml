@@ -1,12 +1,78 @@
 repos:
--   repo: https://github.com/pre-commit/pre-commit-hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v3.2.0
     hooks:
-    -   id: trailing-whitespace
-    -   id: end-of-file-fixer
-    -   id: check-yaml
-    -   id: check-added-large-files
--   repo: https://github.com/psf/black
-    rev: 24.10.0
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: [--maxkb=500]
+
+    # Use ruff for linting
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.7.4
     hooks:
-    -   id: black
+      - id: ruff-format
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        types_or: [python, pyi]
+        require_serial: true
+
+    # Black for code formatting
+  - repo: https://github.com/psf/black
+    rev: 24.10.0 # Replace with the latest stable version
+    hooks:
+      - id: black
+        args: [--line-length=88] # Adjust line length if needed
+
+    # isort for import sorting
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2 # Replace with the latest stable version
+    hooks:
+      - id: isort
+        args: [--profile=black]
+
+    # Flake8 for additional linting (optional, complementing Ruff if needed)
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.1.1 # Replace with the latest stable version
+    hooks:
+      - id: flake8
+        args: [--max-line-length=88] # Align with Black's line length
+
+    # Detect secrets in code
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0 # Replace with the latest stable version
+    hooks:
+      - id: detect-secrets
+        args: [--baseline .secrets.baseline]
+
+    # Prettier for formatting non-Python files
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.1.0 # Replace with the latest stable version
+    hooks:
+      - id: prettier
+        files: "\\.(json|yaml|yml|md|html|css|js|jsx|tsx?)$"
+
+    # Check Python code for syntax errors, undefined names, etc.
+  - repo: https://github.com/pre-commit/pygrep-hooks
+    rev: v1.10.0
+    hooks:
+      - id: python-use-type-annotations
+
+    # Bandit for security issues
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.8.0 # Replace with the latest stable version
+    hooks:
+      - id: bandit
+        args: [--skip=B101] # Skip specific tests if needed
+
+    # MyPy for static type checking
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0 # Replace with the latest stable version
+    hooks:
+      - id: mypy
+
+  - repo: https://github.com/asottile/add-trailing-comma
+    rev: v3.1.0
+    hooks:
+      - id: add-trailing-comma
