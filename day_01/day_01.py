@@ -1,7 +1,7 @@
 import pandas as pd
 
 # read input into dataframe
-input_file = "day_one_input.txt"
+input_file = "input/day_one_input.txt"
 df = pd.read_csv(input_file, sep=" ", index_col=None, header=None, usecols=[0, 3], names=["List1", "List2"])
 
 # sort values in both columns in ascending order
