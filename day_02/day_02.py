@@ -8,35 +8,26 @@ df = pd.read_csv(
 
 
 def row_safety_check(row):
-    status_check = "Safe"
-    check_direction = []
     check_gap = []
-    check_value = None
+    check_directions = []
+    prev_value = None
 
     for value in row:
         if pd.isna(value):  # Skip NaN values
             continue
-        if check_value is None:
-            check_value = value
-        else:
-            gap = abs(value - check_value)
+        if prev_value is not None:
+            gap = abs(value - prev_value)
             check_gap.append(gap)
 
-            if check_value > value:
-                check_direction.append("DESC")
-            else:
-                check_direction.append("ASC")
+            direction = "DESC" if prev_value > value else "ASC"
+            check_directions.append(direction)
 
-            check_value = value
+        prev_value = value
 
-    if not all(1 <= gap <= 3 for gap in check_gap):
-        status_check = "Unsafe"
+    gaps_valid = all(1 <= gap <= 3 for gap in check_gap)
+    directions_consistent = len(set(check_directions)) <= 1
 
-    unique_directions = set(check_direction)
-    if len(unique_directions) > 1:
-        status_check = "Unsafe"
-
-    return status_check
+    return "Safe" if gaps_valid and directions_consistent else "Unsafe"
 
 
 df["Status"] = df.apply(row_safety_check, axis=1)
