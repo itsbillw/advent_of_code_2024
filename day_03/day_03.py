@@ -2,22 +2,17 @@ import re
 
 input_filename = "input/day_three_input.txt"
 
-file = open(input_filename, "r")
-
-# Checking for pattern "mul(X,Y)" where X and Y are 1-3 digit numbers
+# Regular expression pattern to match "mul(X,Y)"
 pattern = r"mul\((\d{1,3}),(\d{1,3})\)"
 
 running_total = 0
 
-while True:
-    content = file.readline()
-    matches = re.findall(pattern, content)
-    results = [(int(x), int(y)) for x, y in matches]
-    for result in results:
-        running_total += result[0] * result[1]
-    if not content:
-        break
+# Read and process the file
+with open(input_filename, "r") as file:
+    content = file.read()
 
-file.close()
+matches = re.findall(pattern, content)
+
+running_total = sum(int(x) * int(y) for x, y in matches)
 
 print(running_total)
