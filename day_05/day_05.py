@@ -40,6 +40,41 @@ def is_valid_update(rules_df, update):
     return not violations.any()
 
 
+def reorder_update(rules_df, update):
+    """
+    Reorder an update based on the ordering rules.
+    Perform a topological sort of the pages based on the constraints.
+    """
+    # Build a dependency graph as adjacency list
+    graph = {page: set() for page in update}
+    for _, row in rules_df.iterrows():
+        if row["X"] in graph and row["Y"] in graph:
+            graph[row["Y"]].add(row["X"])
+
+    # Perform topological sort
+    sorted_pages = []
+    visited = set()
+    temp_mark = set()
+
+    def visit(node):
+        if node in temp_mark:
+            raise ValueError("Cycle detected in rules")
+        if node not in visited:
+            temp_mark.add(node)
+            for predecessor in graph[node]:
+                visit(predecessor)
+            temp_mark.remove(node)
+            visited.add(node)
+            sorted_pages.append(node)
+
+    for page in update:
+        if page not in visited:
+            visit(page)
+
+    # Return sorted list in reverse because we add nodes post-order
+    return sorted_pages[::-1]
+
+
 def find_middle_page(update):
     """
     Find the middle page of an update.
@@ -49,21 +84,27 @@ def find_middle_page(update):
 
 def process_updates(file_path):
     """
-    Process updates and calculate the sum of middle pages for correctly ordered updates.
+    Process updates, validating and reordering where necessary.
+    Calculate the sum of middle pages for both valid and reordered updates.
     """
     rules_df, updates = load_data(file_path)
-    middle_sum = 0
+    middle_sum_valid = 0
+    middle_sum_reordered = 0
 
     for update in updates:
         if is_valid_update(rules_df, update):
-            middle_sum += find_middle_page(update)
+            middle_sum_valid += find_middle_page(update)
+        else:
+            reordered_update = reorder_update(rules_df, update)
+            middle_sum_reordered += find_middle_page(reordered_update)
 
-    return middle_sum
+    return middle_sum_valid, middle_sum_reordered
 
 
 # File path
 input_file = "input/day_five_input.txt"
 
 # Calculate the result
-result = process_updates(input_file)
-print(f"Sum of middle pages for correctly ordered updates: {result}")
+valid_sum, reordered_sum = process_updates(input_file)
+print(f"Sum of middle pages for correctly ordered updates: {valid_sum}")
+print(f"Sum of middle pages for reordered updates: {reordered_sum}")
