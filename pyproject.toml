@@ -5,6 +5,8 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "joblib>=1.4.2",
+    "numba>=0.60.0",
     "pandas>=2.2.3",
     "pre-commit>=4.0.1",
     "ruff>=0.8.1",

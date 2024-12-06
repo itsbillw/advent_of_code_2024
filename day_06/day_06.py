@@ -1,85 +1,138 @@
-import pandas as pd
+import time
+from collections import deque
+
+import numpy as np
+from joblib import Parallel, delayed
+from numba import njit
 
 # Example input grid
 filename = "input/day_six_input.txt"
 with open(filename) as f:
     grid = [list(line.strip()) for line in f]
 
-# Convert grid to DataFrame
-df = pd.DataFrame(grid)
+# Convert grid to NumPy array
+grid = np.array(grid)
 
-# Movement deltas for directions
-directions = {"^": "up", "v": "down", "<": "left", ">": "right"}
-direction_order = ["up", "right", "down", "left"]  # Clockwise order
-moves = {"up": (-1, 0), "down": (1, 0), "left": (0, -1), "right": (0, 1)}
+# Movement deltas (precomputed arrays for Numba compatibility)
+direction_order = np.array(["up", "right", "down", "left"])
+moves = np.array([[-1, 0], [0, 1], [1, 0], [0, -1]])  # up, right, down, left
+direction_indices = {"up": 0, "right": 1, "down": 2, "left": 3}
+
+
+# Numba-accelerated simulation function
+@njit
+def simulate_with_obstruction_numba(grid, start, direction_index, obstruction, moves):
+    rows, cols = grid.shape
+    visited = np.zeros((rows, cols, 4), dtype=np.bool_)  # Track visited states
+    current_r, current_c = start
+    current_direction = direction_index
+    max_steps = rows * cols * 2  # Limit steps to prevent infinite loops
+    step_count = 0
+
+    # Place the obstruction
+    grid[obstruction[0], obstruction[1]] = ord("O")
+
+    while step_count < max_steps:
+        if visited[current_r, current_c, current_direction]:
+            grid[obstruction[0], obstruction[1]] = ord(".")  # Reset the grid
+            return True  # Loop detected
+        visited[current_r, current_c, current_direction] = True
+
+        # Calculate the next move
+        dr, dc = moves[current_direction]
+        next_r, next_c = current_r + dr, current_c + dc
+
+        # Check for boundaries
+        if next_r < 0 or next_r >= rows or next_c < 0 or next_c >= cols:
+            grid[obstruction[0], obstruction[1]] = ord(".")  # Reset the grid
+            return False  # Exited the grid, no loop
+
+        # Check for obstacles
+        if grid[next_r, next_c] in [ord("#"), ord("O")]:
+            # Turn 90 degrees clockwise
+            current_direction = (current_direction + 1) % 4
+            continue
+
+        # Update position and increment step count
+        current_r, current_c = next_r, next_c
+        step_count += 1
+
+    grid[obstruction[0], obstruction[1]] = ord(".")  # Reset the grid
+    return False  # No loop detected
+
+
+# BFS for reachable cells
+def reachable_cells(grid, start):
+    rows, cols = grid.shape
+    visited = np.zeros((rows, cols), dtype=np.bool_)
+    queue = deque([start])
+    reachable = []
+
+    while queue:
+        r, c = queue.popleft()
+        if visited[r, c] or chr(grid[r, c]) in ["#", "O"]:
+            continue
+        visited[r, c] = True
+        reachable.append((r, c))
+
+        for dr, dc in moves:
+            nr, nc = r + dr, c + dc
+            if 0 <= nr < rows and 0 <= nc < cols:
+                queue.append((nr, nc))
+
+    return reachable
+
+
+# Multi-processing with joblib
+def find_valid_positions(grid, start, direction_index, reachable):
+    batch_size = max(1, len(reachable) // 10)  # Dynamically adjust batch size
+    results = Parallel(n_jobs=-1, batch_size=batch_size)(
+        delayed(simulate_with_obstruction_numba)(
+            grid,
+            start,
+            direction_index,
+            obstruction,
+            moves,
+        )
+        for obstruction in reachable
+        if obstruction != start and chr(grid[obstruction[0], obstruction[1]]) == "."
+    )
+
+    # Filter results where loops were detected
+    valid_positions = [reachable[i] for i, result in enumerate(results) if result]
+    return valid_positions
+
+
+# Preprocess the grid for Numba compatibility
+grid = np.vectorize(ord)(grid)  # Convert characters to integers for Numba
+
+# Start the timer
+start_time = time.time()
 
 # Find guard's starting position and direction
 guard_position = None
 guard_direction = None
-for char, direction in directions.items():
-    positions = df.stack()[df.stack() == char].index.tolist()
-    if positions:
-        guard_position = positions[0]
-        guard_direction = direction
+for char, direction in {"^": "up", "v": "down", "<": "left", ">": "right"}.items():
+    positions = np.argwhere(grid == ord(char))
+    if positions.size > 0:
+        guard_position = tuple(positions[0])
+        guard_direction = direction_indices[direction]  # Pass index instead of string
         break
 
+# Find reachable cells and valid positions
+reachable = reachable_cells(grid, guard_position)
+valid_obstruction_positions = find_valid_positions(
+    grid,
+    guard_position,
+    guard_direction,
+    reachable,
+)
 
-# Simulate guard movement with loop detection
-def simulate_with_obstruction(grid, start, direction):
-    visited = set()  # Track visited states (position, direction)
-    current = start
-    current_direction = direction
-    max_steps = grid.size * 2  # Limit steps to prevent infinite loops
-    step_count = 0
-
-    while step_count < max_steps:
-        state = (current, current_direction)
-        if state in visited:
-            return True  # Loop detected
-        visited.add(state)
-
-        # Calculate the next move
-        next_move = (
-            current[0] + moves[current_direction][0],
-            current[1] + moves[current_direction][1],
-        )
-
-        # Check for boundaries
-        if (
-            next_move[0] < 0
-            or next_move[0] >= grid.shape[0]
-            or next_move[1] < 0
-            or next_move[1] >= grid.shape[1]
-        ):
-            return False  # Exited the grid
-
-        # Check for obstacles
-        if grid.loc[next_move[0], next_move[1]] in ["#", "O"]:
-            # Turn 90 degrees clockwise
-            current_direction = direction_order[
-                (direction_order.index(current_direction) + 1) % 4
-            ]
-            continue
-
-        # Update position and increment step count
-        current = next_move
-        step_count += 1
-
-    return False  # No loop detected within the step limit
-
-
-# Test all possible placements of `O`
-valid_obstruction_positions = []
-for r in range(df.shape[0]):
-    for c in range(df.shape[1]):
-        if (r, c) != guard_position and df.loc[r, c] == ".":
-            # Place the obstruction and test
-            df.loc[r, c] = "O"
-            if simulate_with_obstruction(df, guard_position, guard_direction):
-                valid_obstruction_positions.append((r, c))
-            # Remove the obstruction
-            df.loc[r, c] = "."
+# End the timer
+end_time = time.time()
 
 # Output results
-print("Number of valid positions for obstruction:", len(valid_obstruction_positions))
-print("Valid positions:", valid_obstruction_positions)
+print(
+    f"Number of valid positions for obstruction: {len(valid_obstruction_positions)} "
+    f"in {end_time - start_time:.2f} seconds",
+)
