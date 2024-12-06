@@ -1,6 +1,6 @@
 import pandas as pd
 
-# Example input grid (replace with your actual input)
+# Example input grid
 filename = "input/day_six_input.txt"
 with open(filename) as f:
     grid = [list(line.strip()) for line in f]
@@ -8,29 +8,35 @@ with open(filename) as f:
 # Convert grid to DataFrame
 df = pd.DataFrame(grid)
 
-# Characters and their directions
+# Movement deltas for directions
 directions = {"^": "up", "v": "down", "<": "left", ">": "right"}
 direction_order = ["up", "right", "down", "left"]  # Clockwise order
-
-# Find locations of target characters
-locations = []
-for char, direction in directions.items():
-    char_locations = df.stack()[df.stack() == char].index.tolist()
-    for loc in char_locations:
-        locations.append((*loc, direction))
-
-# Movement deltas for each direction
 moves = {"up": (-1, 0), "down": (1, 0), "left": (0, -1), "right": (0, 1)}
 
+# Find guard's starting position and direction
+guard_position = None
+guard_direction = None
+for char, direction in directions.items():
+    positions = df.stack()[df.stack() == char].index.tolist()
+    if positions:
+        guard_position = positions[0]
+        guard_direction = direction
+        break
 
-# Function to simulate movement
-def simulate_movement(grid, start, direction):
-    visited = set()  # Track unique locations visited
+
+# Simulate guard movement with loop detection
+def simulate_with_obstruction(grid, start, direction):
+    visited = set()  # Track visited states (position, direction)
     current = start
     current_direction = direction
+    max_steps = grid.size * 2  # Limit steps to prevent infinite loops
+    step_count = 0
 
-    while True:
-        visited.add(current)
+    while step_count < max_steps:
+        state = (current, current_direction)
+        if state in visited:
+            return True  # Loop detected
+        visited.add(state)
 
         # Calculate the next move
         next_move = (
@@ -45,43 +51,35 @@ def simulate_movement(grid, start, direction):
             or next_move[1] < 0
             or next_move[1] >= grid.shape[1]
         ):
-            break  # Stop if the next move is out of bounds
+            return False  # Exited the grid
 
         # Check for obstacles
-        if grid.loc[next_move[0], next_move[1]] == "#":
+        if grid.loc[next_move[0], next_move[1]] in ["#", "O"]:
             # Turn 90 degrees clockwise
             current_direction = direction_order[
                 (direction_order.index(current_direction) + 1) % 4
             ]
             continue
 
-        # Update current position
+        # Update position and increment step count
         current = next_move
+        step_count += 1
 
-    return visited
+    return False  # No loop detected within the step limit
 
 
-# Simulate for each initial location and direction
-results = []
-all_visited = set()  # Collect all visited locations for visualization
+# Test all possible placements of `O`
+valid_obstruction_positions = []
+for r in range(df.shape[0]):
+    for c in range(df.shape[1]):
+        if (r, c) != guard_position and df.loc[r, c] == ".":
+            # Place the obstruction and test
+            df.loc[r, c] = "O"
+            if simulate_with_obstruction(df, guard_position, guard_direction):
+                valid_obstruction_positions.append((r, c))
+            # Remove the obstruction
+            df.loc[r, c] = "."
 
-for loc in locations:
-    row, col, direction = loc
-    visited = simulate_movement(df, (row, col), direction)
-    all_visited.update(visited)
-    results.append(len(visited))
-
-# Print the total unique locations visited
-print(f"Total Unique Locations Visited: {len(all_visited)}")
-
-"""
-# Mark visited locations on a copy of the grid
-visualized_grid = df.copy()
-for row, col in all_visited:
-    visualized_grid.loc[row, col] = "X"
-
-# Print the visualized grid
-print("\nGrid with Visited Locations Marked:")
-for row in visualized_grid.values:
-    print("".join(row))
-"""
+# Output results
+print("Number of valid positions for obstruction:", len(valid_obstruction_positions))
+print("Valid positions:", valid_obstruction_positions)
