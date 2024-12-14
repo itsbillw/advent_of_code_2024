@@ -1,52 +1,46 @@
-from collections import deque
-
-
 # Helper function to check if a position is valid
 def is_valid(x, y, rows, cols):
     return 0 <= x < rows and 0 <= y < cols
 
 
-# BFS function to count the number of reachable '9's from a trailhead
-def bfs(grid, start_x, start_y, rows, cols):
+# DFS function to find unique paths from a trailhead to a '9'
+def dfs(grid, x, y, rows, cols, path, all_paths):
     # Directions: up, down, left, right
     directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-    queue = deque([(start_x, start_y)])
-    visited = set([(start_x, start_y)])
-    reachable_9s = 0
 
-    while queue:
-        x, y = queue.popleft()
+    # If we reach a '9', add the current path as a valid unique path
+    if grid[x][y] == "9":
+        all_paths.append(path[:])  # Store a copy of the current path
+        return
 
-        # If we reach a '9', increment the count
-        if grid[x][y] == "9":
-            reachable_9s += 1
-
-        # Explore neighbors (up, down, left, right)
-        for dx, dy in directions:
-            nx, ny = x + dx, y + dy
-            if is_valid(nx, ny, rows, cols) and (nx, ny) not in visited:
-                if int(grid[nx][ny]) == int(grid[x][y]) + 1:
-                    visited.add((nx, ny))
-                    queue.append((nx, ny))
-
-    return reachable_9s
+    # Explore neighbors (up, down, left, right)
+    for dx, dy in directions:
+        nx, ny = x + dx, y + dy
+        if is_valid(nx, ny, rows, cols) and (nx, ny) not in path:
+            if int(grid[nx][ny]) == int(grid[x][y]) + 1:
+                path.append((nx, ny))
+                dfs(grid, nx, ny, rows, cols, path, all_paths)
+                path.pop()  # Backtrack
 
 
-# Main function to calculate the sum of all trailhead scores
-def trailhead_scores(grid):
+# Main function to calculate the sum of all trailhead ratings
+def trailhead_ratings(grid):
     rows = len(grid)
     cols = len(grid[0])
-    total_score = 0
+    total_rating = 0
 
     # Loop through all positions in the grid to find trailheads (positions with height 0)
     for i in range(rows):
         for j in range(cols):
-            if grid[i][j] == "0":  # trailhead found
-                # Perform BFS to count reachable '9's
-                score = bfs(grid, i, j, rows, cols)
-                total_score += score
+            if grid[i][j] == "0":  # Trailhead found
+                all_paths = []
+                # Perform DFS to find all unique paths from trailhead to '9'
+                dfs(grid, i, j, rows, cols, [(i, j)], all_paths)
+                # Count the number of unique paths for this trailhead
+                trailhead_rating = len(all_paths)
+                total_rating += trailhead_rating
 
-    return total_score
+    return total_rating
 
 
 # Function to read the grid from the input file
@@ -60,6 +54,6 @@ def read_grid_from_file(filename):
 filename = "input/day_ten_input.txt"
 grid = read_grid_from_file(filename)
 
-# Calculate and print the total score
-result = trailhead_scores(grid)
-print(f"Total score: {result}")
+# Calculate and print the total rating
+result = trailhead_ratings(grid)
+print(f"Total rating: {result}")
