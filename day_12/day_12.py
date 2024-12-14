@@ -1,7 +1,8 @@
 import pandas as pd
+from collections import deque
 
 # Read the garden plot map from the file
-filename = "input/day_twelve_input.txt"
+filename = "input/day_twelve_sample.txt"
 with open(filename) as f:
     garden_map = [list(line.strip()) for line in f]
 
@@ -12,13 +13,18 @@ df = pd.DataFrame(garden_map)
 directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
 
 
-# Function to perform DFS and find a region
-def dfs(x, y, plant_type, visited):
-    stack = [(x, y)]
+# Function to perform BFS and find a region
+def bfs(
+    x: int,
+    y: int,
+    plant_type: str,
+    visited: set[tuple[int, int]],
+) -> tuple[int, int]:
+    queue = deque([(x, y)])
     area = 0
-    perimeter = 0
-    while stack:
-        cx, cy = stack.pop()
+    sides = 0  # Number of external sides for this region
+    while queue:
+        cx, cy = queue.popleft()
         if (cx, cy) in visited:
             continue
         visited.add((cx, cy))
@@ -27,26 +33,34 @@ def dfs(x, y, plant_type, visited):
         for dx, dy in directions:
             nx, ny = cx + dx, cy + dy
             if 0 <= nx < df.shape[0] and 0 <= ny < df.shape[1]:  # within bounds
-                if df.iloc[nx, ny] == plant_type:
-                    if (nx, ny) not in visited:
-                        stack.append((nx, ny))
-                else:
-                    perimeter += 1  # edge touching another region
+                if df.iloc[nx, ny] == plant_type and (nx, ny) not in visited:
+                    queue.append((nx, ny))
+                elif df.iloc[nx, ny] != plant_type:
+                    sides += 1  # boundary with a different region
             else:
-                perimeter += 1  # edge touching the boundary
-    return area, perimeter
+                sides += 1  # boundary with the grid edge
+    return area, sides
 
 
 # Main logic to find all regions and compute the total cost
-visited: set[tuple[int, int]] = set()
+visited: set[tuple[int, int]] = set()  # Annotate visited as a set of tuples (int, int)
 total_cost = 0
 
+# Loop through the entire garden map
 for i in range(df.shape[0]):
     for j in range(df.shape[1]):
         if (i, j) not in visited:
             plant_type = df.iloc[i, j]
-            area, perimeter = dfs(i, j, plant_type, visited)
-            cost = area * perimeter
+            area, sides = bfs(i, j, plant_type, visited)
+            cost = area * sides  # Calculate cost for each isolated region
+
+            # Trace the calculation for this region
+            print(f"Region {plant_type}:")
+            print(f"  Area: {area}")
+            print(f"  Sides: {sides}")
+            print(f"  Cost: {cost}")
+            print("-" * 20)
+
             total_cost += cost
 
 print(f"Total cost: {total_cost}")
